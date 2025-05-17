@@ -9,9 +9,6 @@ import java.util.function.Consumer; // Para el callback del label
 
 public class PrincipalPanel extends JPanel {
 
-    // Cabecera Principal
-
-
     // Tarjetas de Resumen (Panels)
     private JPanel panelTarjetasResumen;
     private JPanel cardUpcomingMatchesPanel;

@@ -37,11 +37,8 @@ public class Controller implements ActionListener {
                 if (loginFrame.getLoginPanel() != null &&
                         e.getActionCommand().equals(loginFrame.getLoginPanel().LOGIN_COMMAND)) {
                     handleLoginAttempt();
-                } else if (loginFrame.getLoginPanel() == null && e.getActionCommand().equals("LOGIN_SUBMIT")){ // Fallback por si getLoginPanel es null pero el comando es conocido
-                    System.err.println("Advertencia: loginFrame.getLoginPanel() es null, pero se procesa LOGIN_SUBMIT.");
-                    handleLoginAttempt();
                 } else {
-                    System.err.println("Error al obtener LoginPanel o comando desconocido en Login: " + e.getActionCommand());
+                    System.err.println("LoginPanel no disponible o comando de login desconocido: " + e.getActionCommand());
                 }
             }
         });
@@ -121,7 +118,7 @@ public class Controller implements ActionListener {
 
         PanelNavegacion navPanel = principalFrame.getNavigationPanel();
         if (navPanel != null && navPanel.getBtnNavDashboard() != null) {
-            // Línea 126 (aproximadamente) CORREGIDA
+
             navPanel.setActiveButton(navPanel.getBtnNavDashboard());
         }
         loadDashboardData();
@@ -138,7 +135,7 @@ public class Controller implements ActionListener {
 
         PanelNavegacion navPanel = principalFrame.getNavigationPanel();
         if (navPanel != null && navPanel.getBtnNavTournaments() != null) {
-            // Línea 141 (aproximadamente) CORREGIDA
+
             navPanel.setActiveButton(navPanel.getBtnNavTournaments());
         }
         loadTournamentsData();
