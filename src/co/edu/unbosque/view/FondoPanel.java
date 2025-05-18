@@ -22,7 +22,7 @@ public class FondoPanel extends JPanel {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         if (backgroundImage != null) {
-            // Escalar la imagen para que cubra todo el panel
+
             g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
         }
     }

@@ -1,251 +1,323 @@
 package co.edu.unbosque.controller;
-
+import co.edu.unbosque.model.ModelFacade;
+import co.edu.unbosque.model.GameDTO;
+import co.edu.unbosque.model.TeamDTO;
 import co.edu.unbosque.view.*;
-
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.text.SimpleDateFormat;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
-
+import java.util.stream.Collectors;
 public class Controller implements ActionListener {
     private LoginFrame loginFrame;
     private PrincipalFrame principalFrame;
-
-    // Referencias a los paneles de contenido principales para gestionarlos
+    private ModelFacade modelFacade;
     private PrincipalPanel dashboardContentPanel;
-    private TorneosPanel torneosPanel;
-    private EquiposPanel equiposPanel; // Nuevo panel para la sección de Equipos
-    // private TeamsPanel teamsPanel; // Ejemplo para futuras secciones (nombre antiguo)
-
-
+    private TournamentsPanel tournamentsPanel;
+    private EquiposPanel equiposPanel;
+    private PartidasPanel partidasPanel;
+    private SimpleDateFormat viewDateFormatWithTime = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+    private SimpleDateFormat viewDateFormatOnlyDate = new SimpleDateFormat("dd/MM/yyyy");
     public Controller() {
+        modelFacade = new ModelFacade();
         loginFrame = new LoginFrame();
-        principalFrame = new PrincipalFrame(); // Asume que PrincipalFrame está refactorizado
-
+        principalFrame = new PrincipalFrame();
         attachLoginListeners();
         principalFrame.setVisible(false);
     }
-
     public void showLogin() {
         loginFrame.setVisible(true);
     }
-
     private void attachLoginListeners() {
-        loginFrame.addLoginListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (loginFrame.getLoginPanel() != null &&
-                        e.getActionCommand().equals(loginFrame.getLoginPanel().LOGIN_COMMAND)) {
-                    handleLoginAttempt();
-                } else if (loginFrame.getLoginPanel() == null && e.getActionCommand().equals("LOGIN_SUBMIT")){
-                    System.err.println("Advertencia: loginFrame.getLoginPanel() es null, pero se procesa LOGIN_SUBMIT.");
-                    handleLoginAttempt();
-                } else {
-                    System.err.println("Error al obtener LoginPanel o comando desconocido en Login: " + e.getActionCommand());
-                }
+        loginFrame.addLoginListener(e -> {
+            if (loginFrame.getLoginPanel() != null &&
+                    e.getActionCommand().equals(loginFrame.getLoginPanel().LOGIN_COMMAND)) {
+                handleLoginAttempt();
+            } else if (e.getActionCommand().equals("LOGIN_SUBMIT")){
+                System.err.println("Advertencia: loginFrame.getLoginPanel() podría ser null o LOGIN_COMMAND no coincide, usando 'LOGIN_SUBMIT' como fallback.");
+                handleLoginAttempt();
             }
         });
     }
-
     private void handleLoginAttempt() {
         String user = loginFrame.getUsername();
         String pass = loginFrame.getPassword();
-
-        if ("admin".equals(user) && "123".equals(pass)) { // Lógica de autenticación
+        if (modelFacade.validateUserCredentials(user, pass)) {
             loginFrame.dispose();
             principalFrame.setVisible(true);
-            setupPrincipalFrameNavigation(); // Configurar navegación y vista inicial
+            setupPrincipalFrameNavigation();
         } else {
             loginFrame.showMessage("Credenciales incorrectas. Por favor, inténtelo de nuevo.",
-                    "Error de Autenticación",
-                    JOptionPane.ERROR_MESSAGE);
+                    "Error de Autenticación", JOptionPane.ERROR_MESSAGE);
             loginFrame.clearFields();
             if (loginFrame.getUsernameField() != null) {
                 loginFrame.getUsernameField().requestFocusInWindow();
             }
         }
     }
-
     private void setupPrincipalFrameNavigation() {
-        principalFrame.addNavigationListeners(this); // El Controller maneja todos los eventos de navegación
-        showDashboardView(); // Mostrar el dashboard como vista inicial
+        principalFrame.addNavigationListeners(this);
+        showDashboardView();
     }
-
     @Override
     public void actionPerformed(ActionEvent e) {
         String command = e.getActionCommand();
         PanelNavegacion navPanel = principalFrame.getNavigationPanel();
-
-        // Validar navPanel para evitar NullPointerException
-        if (navPanel == null && (command.equals(PanelNavegacion.NAV_DASHBOARD_COMMAND) ||
-                command.equals(PanelNavegacion.NAV_TOURNAMENTS_COMMAND) ||
-                command.equals(PanelNavegacion.NAV_TEAMS_COMMAND) ||
-                command.equals(PanelNavegacion.NAV_MATCHES_COMMAND) ||
-                command.equals(PanelNavegacion.NAV_REPORTS_COMMAND) ||
-                command.equals(PanelNavegacion.NAV_SETTINGS_COMMAND))) {
-            System.err.println("Panel de Navegación (PanelNavegacion) no encontrado en PrincipalFrame.");
+        boolean comandoDeNavegacionPrincipal = true;
+        if (navPanel == null && command.startsWith("NAV_")) {
+            System.err.println("Panel de Navegación no encontrado en PrincipalFrame.");
             return;
         }
-
-        boolean comandoDeNavegacionPrincipal = true;
-
         switch (command) {
-            case PanelNavegacion.NAV_DASHBOARD_COMMAND:
-                showDashboardView();
-                break;
-            case PanelNavegacion.NAV_TOURNAMENTS_COMMAND:
-                showTorneosView();
-                break;
-            case PanelNavegacion.NAV_TEAMS_COMMAND:
-                showEquiposView(); // Mostrar la nueva vista de Equipos
-                break;
-            case PanelNavegacion.NAV_MATCHES_COMMAND:
-                principalFrame.showMessage("Sección 'Partidas' no implementada todavía.", "En Desarrollo", JOptionPane.INFORMATION_MESSAGE);
-                if (navPanel != null) navPanel.setActiveButton(navPanel.getBtnNavMatches());
-                break;
+            case PanelNavegacion.NAV_DASHBOARD_COMMAND: showDashboardView(); break;
+            case PanelNavegacion.NAV_TOURNAMENTS_COMMAND: showTournamentsView(); break;
+            case PanelNavegacion.NAV_TEAMS_COMMAND: showEquiposView(); break;
+            case PanelNavegacion.NAV_MATCHES_COMMAND: showPartidasView(); break;
             case PanelNavegacion.NAV_REPORTS_COMMAND:
-                principalFrame.showMessage("Sección 'Reportes' no implementada todavía.", "En Desarrollo", JOptionPane.INFORMATION_MESSAGE);
+                principalFrame.showMessage("Sección 'Reportes' no implementada.", "En Desarrollo", JOptionPane.INFORMATION_MESSAGE);
                 if (navPanel != null) navPanel.setActiveButton(navPanel.getBtnNavReports());
                 break;
             case PanelNavegacion.NAV_SETTINGS_COMMAND:
-                principalFrame.showMessage("Sección 'Configuración' no implementada todavía.", "En Desarrollo", JOptionPane.INFORMATION_MESSAGE);
+                principalFrame.showMessage("Sección 'Configuración' no implementada.", "En Desarrollo", JOptionPane.INFORMATION_MESSAGE);
                 if (navPanel != null) navPanel.setActiveButton(navPanel.getBtnNavSettings());
                 break;
             default:
-                comandoDeNavegacionPrincipal = false; // No fue un comando de navegación principal
+                comandoDeNavegacionPrincipal = false;
                 break;
         }
-
-        if(comandoDeNavegacionPrincipal) return; // Si ya se manejó, salir
-
-        // Manejar otros comandos (específicos de los paneles de contenido)
+        if (comandoDeNavegacionPrincipal) return;
         if (command.equals(EquiposPrincipalPanel.ACCION_CREAR_EQUIPO)) {
             handleCrearNuevoEquipo();
         } else if (command.equals(EquiposPrincipalPanel.ACCION_BUSCAR_EQUIPOS)) {
             handleBuscarEquipos();
         }
-        // Nota: ACCION_VER_DETALLES_EQUIPO se maneja con un callback directamente en EquiposVistaGeneralPanel
-        // que llama a equiposPanel.mostrarDetalleEquipo(idEquipo). Si se necesita lógica adicional
-        // en el controller para esa acción, se podría ajustar.
-
-        // Aquí puedes añadir más 'else if' para otros action commands de otros paneles
-    }
-
-    private void showDashboardView() {
-        if (dashboardContentPanel == null) {
-            dashboardContentPanel = new PrincipalPanel();
+        else if (command.equals(PartidasVistaGeneralPanel.ACCION_AGENDAR_PARTIDA)) {
+            handleAgendarNuevaPartida();
+        } else if (command.equals(PartidasVistaGeneralPanel.ACCION_BUSCAR_PARTIDAS)) {
+            handleBuscarPartidas();
         }
+        else if (command.startsWith(PartidasVistaGeneralPanel.ACCION_EDITAR_PARTIDA_TABLA)) {
+            String partidaId = command.substring(PartidasVistaGeneralPanel.ACCION_EDITAR_PARTIDA_TABLA.length());
+            handleEditarPartida(partidaId);
+        } else if (command.startsWith(PartidasVistaGeneralPanel.ACCION_REPORTAR_RESULTADO_TABLA)) {
+            String partidaId = command.substring(PartidasVistaGeneralPanel.ACCION_REPORTAR_RESULTADO_TABLA.length());
+            handleReportarResultado(partidaId);
+        }
+        else if (command.startsWith(PartidaDetallePanel.ACCION_REPROGRAMAR_FECHA)) {
+            handleReprogramarFechaPartida(command.substring(PartidaDetallePanel.ACCION_REPROGRAMAR_FECHA.length()));
+        } else if (command.startsWith(PartidaDetallePanel.ACCION_GUARDAR_RESULTADO)) {
+            handleGuardarResultadoPartida(command.substring(PartidaDetallePanel.ACCION_GUARDAR_RESULTADO.length()));
+        } else if (command.startsWith(PartidaDetallePanel.ACCION_ADJUNTAR_EVIDENCIA)) {
+            handleAdjuntarEvidenciaPartida(command.substring(PartidaDetallePanel.ACCION_ADJUNTAR_EVIDENCIA.length()));
+        } else if (command.startsWith(PartidaDetallePanel.ACCION_CONFIRMAR_RESULTADO_DETALLE)) {
+            handleConfirmarResultadoDetallePartida(command.substring(PartidaDetallePanel.ACCION_CONFIRMAR_RESULTADO_DETALLE.length()));
+        } else {
+            System.out.println("Comando de panel no reconocido por el Controller: '" + command + "'");
+        }
+    }
+    private void showDashboardView() {
+        if (dashboardContentPanel == null) dashboardContentPanel = new PrincipalPanel();
         if (!(principalFrame.getCurrentCenterPanel() instanceof PrincipalPanel)) {
             principalFrame.setCenterPanel(dashboardContentPanel);
         }
         principalFrame.setMainContentTitle("Dashboard");
-        PanelNavegacion navPanel = principalFrame.getNavigationPanel();
-        if (navPanel != null && navPanel.getBtnNavDashboard() != null) {
-            navPanel.setActiveButton(navPanel.getBtnNavDashboard());
-        }
+        if (principalFrame.getNavigationPanel() != null)
+            principalFrame.getNavigationPanel().setActiveButton(principalFrame.getNavigationPanel().getBtnNavDashboard());
         loadDashboardData();
     }
-
-    private void showTorneosView() {
-        if (torneosPanel == null) {
-            torneosPanel = new TorneosPanel();
-        }
-        if (!(principalFrame.getCurrentCenterPanel() instanceof TorneosPanel)) {
-            principalFrame.setCenterPanel(torneosPanel);
+    private void showTournamentsView() {
+        if (tournamentsPanel == null) tournamentsPanel = new TournamentsPanel();
+        if (!(principalFrame.getCurrentCenterPanel() instanceof TournamentsPanel)) {
+            principalFrame.setCenterPanel(tournamentsPanel);
         }
         principalFrame.setMainContentTitle("Torneos");
-        PanelNavegacion navPanel = principalFrame.getNavigationPanel();
-        if (navPanel != null && navPanel.getBtnNavTournaments() != null) {
-            navPanel.setActiveButton(navPanel.getBtnNavTournaments());
-        }
+        if (principalFrame.getNavigationPanel() != null)
+            principalFrame.getNavigationPanel().setActiveButton(principalFrame.getNavigationPanel().getBtnNavTournaments());
         loadTournamentsData();
     }
-
     private void showEquiposView() {
-        if (equiposPanel == null) {
-            // EquiposPanel espera un ActionListener general en su constructor
-            // para acciones como "Crear Nuevo Equipo" o "Buscar"
-            equiposPanel = new EquiposPanel(this);
-        }
+        if (equiposPanel == null) equiposPanel = new EquiposPanel(this);
         if (!(principalFrame.getCurrentCenterPanel() instanceof EquiposPanel)) {
             principalFrame.setCenterPanel(equiposPanel);
         }
         principalFrame.setMainContentTitle("Gestión de Equipos");
-        PanelNavegacion navPanel = principalFrame.getNavigationPanel();
-        if (navPanel != null && navPanel.getBtnNavTeams() != null) {
-            navPanel.setActiveButton(navPanel.getBtnNavTeams());
-        }
+        if (principalFrame.getNavigationPanel() != null)
+            principalFrame.getNavigationPanel().setActiveButton(principalFrame.getNavigationPanel().getBtnNavTeams());
         loadEquiposOverviewData();
     }
-
+    private void showPartidasView() {
+        if (partidasPanel == null) partidasPanel = new PartidasPanel(this);
+        if (!(principalFrame.getCurrentCenterPanel() instanceof PartidasPanel)) {
+            principalFrame.setCenterPanel(partidasPanel);
+        }
+        principalFrame.setMainContentTitle("Gestión de Partidas");
+        if (principalFrame.getNavigationPanel() != null)
+            principalFrame.getNavigationPanel().setActiveButton(principalFrame.getNavigationPanel().getBtnNavMatches());
+        loadPartidasOverviewData();
+    }
     private void loadDashboardData() {
-        System.out.println("Cargando datos del Dashboard...");
-        if (dashboardContentPanel != null) {
-            dashboardContentPanel.updateSummaryCards("Próximo: Duelo Épico", "7 Activos", "Mega Jugador");
-            Object[][] matchesData = {
-                    {"Los Imbatibles vs. Los Invencibles", "Mañana 18:00", "Programado"},
-                    {"Equipo Delta vs. Equipo Gamma", "Ayer 20:00", "Finalizado (1-3)"}
-            };
-            dashboardContentPanel.updateRecentMatchesTable(matchesData);
+        if (dashboardContentPanel != null && modelFacade != null) {
+            Object[] summaryData = modelFacade.getDashboardSummaryData();
+            if (summaryData != null && summaryData.length >= 3) {
+                dashboardContentPanel.updateSummaryCards(
+                        summaryData[0] != null ? summaryData[0].toString() : "N/A",
+                        summaryData[1] != null ? summaryData[1].toString() : "N/A",
+                        summaryData[2] != null ? summaryData[2].toString() : "N/A"
+                );
+            }
+            List<Object[]> matchesDataList = modelFacade.getDashboardRecentMatches();
+            Object[][] matchesDataArray = null;
+            if (matchesDataList != null) {
+                matchesDataArray = new Object[matchesDataList.size()][];
+                for (int i = 0; i < matchesDataList.size(); i++) {
+                    matchesDataArray[i] = matchesDataList.get(i);
+                }
+            } else {
+                matchesDataArray = new Object[0][0];
+            }
+            dashboardContentPanel.updateRecentMatchesTable(matchesDataArray);
         }
     }
-
     private void loadTournamentsData() {
-        System.out.println("Cargando datos de Torneos...");
-        if (torneosPanel != null && torneosPanel.getGeneralInfoPanel() != null) {
-            List<Object[]> sampleTournamentData = new ArrayList<>();
-            sampleTournamentData.add(new Object[]{"Copa Continental", "En curso", "/imagenes/logo_generic_game.png", "24 equipos", "Global", "Jun 2025 - Sep 2025", true});
-            sampleTournamentData.add(new Object[]{"Liga Estelar", "Finalizado", "/imagenes/logo_fifa.png", "16 equipos", "Nacional", "Ene 2025 - Abr 2025", false});
-
+        if (tournamentsPanel != null && tournamentsPanel.getGeneralInfoPanel() != null && modelFacade != null) {
+            List<Object[]> tournamentDataList = modelFacade.getTournamentsListForOverview();
             ActionListener tournamentDetailsListener = ae -> {
                 JButton button = (JButton) ae.getSource();
                 String tournamentName = "N/A";
-                if(button.getClientProperty("tournamentName") != null){ // Chequeo de nulidad
+                if(button.getClientProperty("tournamentName") != null){
                     tournamentName = button.getClientProperty("tournamentName").toString();
                 }
-                principalFrame.showMessage("Detalles (Controller): " + tournamentName, "Info Torneo", JOptionPane.INFORMATION_MESSAGE);
+                principalFrame.showMessage("Detalles del Torneo (Controller): " + tournamentName, "Info Torneo", JOptionPane.INFORMATION_MESSAGE);
             };
-            torneosPanel.getGeneralInfoPanel().refreshTournamentCards(sampleTournamentData, tournamentDetailsListener);
+            tournamentsPanel.getGeneralInfoPanel().refreshTournamentCards(tournamentDataList, tournamentDetailsListener);
         }
     }
-
     private void loadEquiposOverviewData() {
-        System.out.println("Cargando datos para la vista general de equipos...");
-        if (equiposPanel != null && equiposPanel.getEquiposPrincipalPanel() != null) {
-            List<Object[]> datosFicticios = new ArrayList<>();
-            datosFicticios.add(new Object[]{"Águilas Reales", "/imagenes/logo_equipo_1.png", 6, "Ciudad Capital, PA", "Overwatch", "EQ007"});
-            datosFicticios.add(new Object[]{"Serpientes Cósmicas", "/imagenes/logo_equipo_2.png", 5, "Metrópolis Norte, EC", "League of Legends", "EQ008"});
-            datosFicticios.add(new Object[]{"Robots Invencibles", "/imagenes/logo_equipo_3.png", 7, "Tecnopolis, AR", "Apex Legends", "EQ009"});
-            equiposPanel.getEquiposPrincipalPanel().actualizarTarjetasEquipos(datosFicticios, this); // 'this' para el listener general
+        if (equiposPanel != null && equiposPanel.getEquiposPrincipalPanel() != null && modelFacade != null) {
+            List<TeamDTO> teamDTOs = modelFacade.getAllTeamDTOs();
+            List<Object[]> viewData = new ArrayList<>();
+            if (teamDTOs != null) {
+                for (TeamDTO dto : teamDTOs) {
+                    String coachName = (dto.getCoach() != null && dto.getCoach().getName() != null) ? dto.getCoach().getName() : "N/A";
+                    viewData.add(new Object[]{
+                            dto.getTeamName(),
+                            "/imagenes/logo_equipo_default.png",
+                            0,
+                            "Ubicación N/A",
+                            dto.getTournamentFormat(),
+                            dto.getTeamName()
+                    });
+                }
+            }
+            equiposPanel.getEquiposPrincipalPanel().actualizarTarjetasEquipos(viewData, this);
         }
     }
-
-    private void handleCrearNuevoEquipo() {
-        // Lógica para mostrar un JDialog o cambiar a un panel de creación de equipo.
-        // Por ejemplo, podrías tener un método en EquiposPanel para mostrar una vista de formulario.
-        // equiposPanel.mostrarFormularioCrearEquipo();
-        principalFrame.showMessage("Acción: Crear Nuevo Equipo (Implementar formulario/dialogo).", "Crear Equipo", JOptionPane.INFORMATION_MESSAGE);
-        // Si se crea un equipo, se debería refrescar la lista:
-        // loadEquiposOverviewData();
+    private void loadPartidasOverviewData() {
+        if (partidasPanel != null && partidasPanel.getVistaGeneralPanel() != null && modelFacade != null) {
+            List<GameDTO> matchDTOs = modelFacade.getAllMatchDTOs();
+            List<Object[]> viewData = new ArrayList<>();
+            if (matchDTOs != null) {
+                for (GameDTO dto : matchDTOs) {
+                    String enfrentamiento = dto.getGameTitle();
+                    if (dto.getTeamsList() != null && !dto.getTeamsList().isEmpty()) {
+                        enfrentamiento = dto.getTeamsList().stream()
+                                .map(team -> team != null ? team.getTeamName() : "Equipo Desconocido")
+                                .collect(Collectors.joining(" vs "));
+                    }
+                    String fechaStr = "N/A";
+                    if (dto.getDate() != null) {
+                        try {
+                            fechaStr = viewDateFormatOnlyDate.format(Date.from(dto.getDate().atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                        } catch (Exception ex) {
+                            System.err.println("Error formateando fecha de partida: " + ex.getMessage());
+                        }
+                    }
+                    viewData.add(new Object[]{
+                            dto.getGameTitle(),
+                            "Torneo Placeholder",
+                            "Ronda Placeholder",
+                            enfrentamiento,
+                            fechaStr,
+                            "Estado Placeholder",
+                            "Resultado Placeholder"
+                    });
+                }
+            }
+            partidasPanel.getVistaGeneralPanel().actualizarTablaPartidas(viewData);
+        }
     }
-
+    private void handleCrearNuevoEquipo() {
+        JTextField teamNameField = new JTextField();
+        JTextField formatField = new JTextField();
+        Object[] message = {
+                "Nombre del Equipo:", teamNameField,
+                "Juego Principal/Formato:", formatField
+        };
+        int option = JOptionPane.showConfirmDialog(principalFrame, message, "Crear Nuevo Equipo", JOptionPane.OK_CANCEL_OPTION);
+        if (option == JOptionPane.OK_OPTION) {
+            String teamName = teamNameField.getText();
+            String format = formatField.getText();
+            if (teamName != null && !teamName.trim().isEmpty() && format != null && !format.trim().isEmpty()) {
+                TeamDTO newTeam = new TeamDTO(format, teamName, null);
+                if (modelFacade.addTeam(newTeam)) {
+                    principalFrame.showMessage("Equipo '" + teamName + "' creado exitosamente.", "Equipo Creado", JOptionPane.INFORMATION_MESSAGE);
+                    loadEquiposOverviewData();
+                } else {
+                    principalFrame.showMessage("Error al crear el equipo (quizás ya existe).", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } else {
+                principalFrame.showMessage("Nombre del equipo y formato no pueden estar vacíos.", "Datos Inválidos", JOptionPane.WARNING_MESSAGE);
+            }
+        }
+    }
     private void handleBuscarEquipos() {
         if (equiposPanel != null && equiposPanel.getEquiposPrincipalPanel() != null) {
             String termino = equiposPanel.getEquiposPrincipalPanel().getTerminoBusqueda();
-            String torneoF = equiposPanel.getEquiposPrincipalPanel().getFiltroTorneoSeleccionado();
-            String juegoF = equiposPanel.getEquiposPrincipalPanel().getFiltroJuegoSeleccionado();
-            String jugadoresF = equiposPanel.getEquiposPrincipalPanel().getFiltroJugadoresSeleccionado();
-
-            System.out.println("Buscando con: Termino='" + termino + "', Torneo='" + torneoF + "', Juego='" + juegoF + "', Jugadores='" + jugadoresF + "'");
-            principalFrame.showMessage("Búsqueda/Filtrado activado (Implementar lógica de filtrado de datos).", "Buscar Equipos", JOptionPane.INFORMATION_MESSAGE);
-
-            // Aquí iría la lógica para:
-            // 1. Obtener los datos originales de los equipos (quizás de una clase de Modelo/Servicio).
-            // 2. Aplicar los filtros y el término de búsqueda a esos datos.
-            // 3. Llamar a equiposPanel.getVistaGeneralPanel().actualizarTarjetasEquipos(datosFiltrados, this);
-            // Ejemplo (muy simplificado, solo para mostrar el flujo):
-            // loadEquiposOverviewData(); // Por ahora, recarga todos como si no hubiera filtro
+            principalFrame.showMessage("Buscando equipos con término: '" + termino + "' (Funcionalidad de filtrado real pendiente).", "Buscar Equipos", JOptionPane.INFORMATION_MESSAGE);
+            loadEquiposOverviewData();
         }
+    }
+    private void handleAgendarNuevaPartida() {
+        principalFrame.showMessage("Acción: Agendar Nueva Partida (Implementar formulario/dialogo).", "Agendar Partida", JOptionPane.INFORMATION_MESSAGE);
+    }
+    private void handleBuscarPartidas() {
+        if (partidasPanel != null && partidasPanel.getVistaGeneralPanel() != null) {
+            String termino = partidasPanel.getVistaGeneralPanel().getTerminoBusquedaGlobal();
+            principalFrame.showMessage("Buscando partidas con término: '" + termino + "' (Funcionalidad de filtrado real pendiente).", "Buscar Partidas", JOptionPane.INFORMATION_MESSAGE);
+            loadPartidasOverviewData();
+        }
+    }
+    private void handleEditarPartida(String partidaId) {
+        principalFrame.showMessage("Acción: Editar Partida ID " + partidaId + "\n(Implementar lógica de edición).", "Editar Partida", JOptionPane.INFORMATION_MESSAGE);
+        if(partidasPanel != null) {
+            partidasPanel.mostrarDetallePartida(partidaId);
+        }
+    }
+    private void handleReportarResultado(String partidaId) {
+        principalFrame.showMessage("Acción: Reportar resultado para Partida ID " + partidaId + "\n(Implementar lógica).", "Reportar Resultado", JOptionPane.INFORMATION_MESSAGE);
+        if(partidasPanel != null) {
+            partidasPanel.mostrarDetallePartida(partidaId);
+        }
+    }
+    private void handleReprogramarFechaPartida(String partidaId) {
+        principalFrame.showMessage("Acción: Reprogramar Fecha para Partida ID " + partidaId + "\n(Implementar lógica).", "Reprogramar Partida", JOptionPane.INFORMATION_MESSAGE);
+    }
+    private void handleGuardarResultadoPartida(String partidaId) {
+        principalFrame.showMessage("Acción: Guardar Resultado para Partida ID " + partidaId + "\n(Implementar lógica).", "Guardar Resultado", JOptionPane.INFORMATION_MESSAGE);
+    }
+    private void handleAdjuntarEvidenciaPartida(String partidaId) {
+        JFileChooser fileChooser = new JFileChooser();
+        int result = fileChooser.showOpenDialog(principalFrame);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            java.io.File selectedFile = fileChooser.getSelectedFile();
+            principalFrame.showMessage("Archivo seleccionado: " + selectedFile.getAbsolutePath() + "\nPara Partida ID " + partidaId + " (Implementar lógica de guardado).", "Adjuntar Evidencia", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+    private void handleConfirmarResultadoDetallePartida(String partidaId) {
+        principalFrame.showMessage("Acción: Confirmar Resultado (Admin) para Partida ID " + partidaId + "\n(Implementar lógica de confirmación).", "Confirmar Resultado", JOptionPane.INFORMATION_MESSAGE);
     }
 }
